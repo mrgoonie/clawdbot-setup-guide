@@ -89,12 +89,15 @@ clawdbot doctor
 {
   "channels": {
     "whatsapp": {
-      "dmPolicy": "allowlist",
-      "allowFrom": ["+84123456789"]
+      "selfChatMode": true,
+      "dmPolicy": "open",
+      "allowFrom": ["*"]
     }
   }
 }
 ```
+
+> **Note:** When using `dmPolicy: "open"`, you must include `allowFrom: ["*"]`
 
 2. Link your WhatsApp account:
 
@@ -104,14 +107,28 @@ clawdbot channels login
 
 3. Scan the QR code with WhatsApp > Linked Devices > Link a Device
 
+4. Chat with the bot via "Message yourself" feature in WhatsApp
+
 **Configuration Options:**
 
 | Option | Values | Description |
 |--------|--------|-------------|
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | DM access control |
-| `allowFrom` | `["+1234567890"]` | Allowed phone numbers (E.164 format) |
-| `selfChatMode` | `true/false` | Enable for personal WhatsApp number |
-| `ackReaction` | emoji | Auto-react on message receipt |
+| `allowFrom` | `["+1234567890"]` or `["*"]` | Allowed phone numbers (E.164 format), use `*` for open policy |
+| `selfChatMode` | `true/false` | **Required** when messaging yourself |
+
+**Allowlist Mode Example:**
+
+```json
+{
+  "channels": {
+    "whatsapp": {
+      "dmPolicy": "allowlist",
+      "allowFrom": ["+84123456789", "+84987654321"]
+    }
+  }
+}
+```
 
 **Pairing Mode (for unknown senders):**
 
@@ -136,13 +153,17 @@ clawdbot pairing approve whatsapp <CODE>
 {
   "channels": {
     "telegram": {
-      "enabled": true,
       "botToken": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
-      "dmPolicy": "pairing"
+      "dmPolicy": "open",
+      "allowFrom": ["*"],
+      "groupPolicy": "open",
+      "groupAllowFrom": ["*"]
     }
   }
 }
 ```
+
+> **Note:** When using `dmPolicy: "open"`, you must include `allowFrom: ["*"]`. Same for groups.
 
 3. Restart gateway:
 
@@ -150,13 +171,30 @@ clawdbot pairing approve whatsapp <CODE>
 systemctl --user restart clawdbot-gateway
 ```
 
+4. Find your bot on Telegram and send `/start` or any message
+
 **Configuration Options:**
 
 | Option | Values | Description |
 |--------|--------|-------------|
+| `botToken` | `"123:ABC..."` | Bot token from BotFather |
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | DM access control |
+| `allowFrom` | `["*"]` or `["user_id"]` | Required when dmPolicy is `open` |
 | `groupPolicy` | `allowlist`, `open`, `disabled` | Group access control |
-| `customCommands` | `[{command, description}]` | Add custom bot commands |
+| `groupAllowFrom` | `["*"]` | Required when groupPolicy is `open` |
+
+**Pairing Mode Example:**
+
+```json
+{
+  "channels": {
+    "telegram": {
+      "botToken": "YOUR_BOT_TOKEN",
+      "dmPolicy": "pairing"
+    }
+  }
+}
+```
 
 **Group Settings:**
 
@@ -199,13 +237,15 @@ systemctl --user restart clawdbot-gateway
 {
   "channels": {
     "discord": {
-      "enabled": true,
       "token": "YOUR_DISCORD_BOT_TOKEN",
-      "dmPolicy": "pairing"
+      "dmPolicy": "open",
+      "allowFrom": ["*"]
     }
   }
 }
 ```
+
+> **Note:** Do NOT use `"enabled": true` - this key is not valid.
 
 4. Restart gateway:
 
@@ -217,7 +257,9 @@ systemctl --user restart clawdbot-gateway
 
 | Option | Values | Description |
 |--------|--------|-------------|
+| `token` | `"YOUR_BOT_TOKEN"` | Discord bot token |
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | DM access control |
+| `allowFrom` | `["*"]` or `["user_id"]` | Required when dmPolicy is `open` |
 | `guilds.<id>.allowFrom` | `["user_id"]` | Per-guild allowlist |
 
 ---
@@ -297,10 +339,14 @@ Full config file location: `~/.clawdbot/clawdbot.json`
 | Issue | Solution |
 |-------|----------|
 | `command not found: clawdbot` | Add npm bin to PATH: `export PATH="$HOME/.npm-global/bin:$PATH"` |
+| `dmPolicy="open" requires allowFrom to include "*"` | Add `"allowFrom": ["*"]` to channel config |
+| `Unrecognized key: "enabled"` | Remove `"enabled": true` from channel config - it's not valid |
+| WhatsApp no response to self-chat | Add `"selfChatMode": true` to whatsapp config |
 | WhatsApp disconnected | Run `clawdbot channels login` and re-scan QR |
 | Telegram bot not responding | Check `/setprivacy` is disabled in BotFather |
 | Discord bot silent | Enable "Message Content Intent" in Developer Portal |
 | Gateway won't start | Check logs: `journalctl --user -u clawdbot-gateway -f` |
+| Config invalid | Run `clawdbot doctor --fix` to auto-fix common issues |
 | Model auth failed | Verify API key in config and restart gateway |
 
 ---
