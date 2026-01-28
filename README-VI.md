@@ -2,6 +2,67 @@
 
 Triển khai ClawdBot trên VPS Ubuntu với MiniMax M2.1 làm backend AI.
 
+## ⚠️ Cảnh báo bảo mật
+
+> **QUAN TRỌNG:** Đọc kỹ các cảnh báo này trước khi triển khai ClawdBot trên production.
+
+### Bảo mật cài đặt
+
+- **Rủi ro curl-pipe-bash:** Phương thức `curl | bash` chạy code từ xa mà không kiểm tra. Luôn xem script trước: `curl -fsSL https://clawd.bot/install.sh -o install.sh && less install.sh && bash install.sh`
+- **Kiểm tra checksum:** Khi có thể, xác minh tính toàn vẹn của package trước khi cài
+
+### API Keys & Thông tin đăng nhập
+
+- **Không commit credentials:** Không commit `clawdbot.json` chứa API key lên git. Thêm vào `.gitignore`
+- **Dùng biến môi trường:** Nên dùng `MINIMAX_API_KEY`, `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN` thay vì hardcode trong config
+- **Giới hạn quyền file:** `chmod 600 ~/.clawdbot/clawdbot.json` để người dùng khác không đọc được credentials
+- **Đổi key định kỳ:** Nếu nghi ngờ key bị lộ, tạo lại ngay lập tức
+
+### Kiểm soát truy cập ⚠️
+
+- **`dmPolicy: "open"` + `allowFrom: ["*"]` = BẤT KỲ AI cũng dùng được bot.** Bao gồm người lạ, spammer, và kẻ xấu sẽ tiêu tốn API credits của bạn
+- **Ưu tiên `allowlist` mode** trên production với danh sách số điện thoại/user ID cụ thể
+- **`pairing` mode** thêm bước xác nhận nhưng ngăn truy cập trái phép
+- **Theo dõi sử dụng:** Kiểm tra `clawdbot logs` thường xuyên để phát hiện hoạt động bất thường
+
+### Bảo mật mạng
+
+- **`gateway.bind: "loopback"`** (mặc định) chỉ nhận kết nối local - **không đổi sang `0.0.0.0` trừ khi có firewall**
+- **Quy tắc firewall:** Nếu mở port gateway, giới hạn truy cập qua `ufw` hoặc `iptables`
+- **Dùng reverse proxy:** Để truy cập từ xa, dùng nginx/caddy với TLS thay vì mở port trực tiếp
+
+### Bảo mật Bot Token
+
+- **Token Telegram/Discord cho phép kiểm soát toàn bộ bot.** Xử lý như mật khẩu
+- **Thu hồi token bị lộ ngay lập tức:** Dùng BotFather `/revoke` hoặc Discord Developer Portal
+- **Không chia sẻ token** trong screenshots, logs, hoặc yêu cầu hỗ trợ
+
+### Bảo mật Workspace
+
+- **`agents.defaults.workspace`** định nghĩa nơi AI có thể đọc/ghi files. Giới hạn vào thư mục riêng
+- **Không bao giờ đặt workspace là `/` hoặc `$HOME`** - điều này cho AI truy cập vào files nhạy cảm
+- **Cân nhắc sandboxing** với containers hoặc user bị giới hạn quyền cho triển khai bảo mật cao
+
+### Công cụ kiểm tra bảo mật
+
+Sử dụng [Clawdbot-Security-Check](https://github.com/TheSethRose/Clawdbot-Security-Check) để tự động kiểm tra bảo mật:
+
+- **Framework tự kiểm tra** giúp ClawdBot đánh giá tình trạng bảo mật của chính nó
+- **13 domain bảo mật** được kiểm tra: gateway exposure, DM policies, credentials, file permissions, plugin trust, prompt injection risks, secret scanning, v.v.
+- **Kiểm tra chỉ đọc** - tạo báo cáo mà không thay đổi config
+- **Hướng dẫn khắc phục** cho từng phát hiện
+
+```bash
+# Cài đặt
+clawdhub install clawdbot-security-check
+
+# Chạy kiểm tra
+@clawdbot audit my security
+@clawdbot security audit --deep
+```
+
+---
+
 ## Yêu cầu
 
 - VPS Ubuntu (đã test trên 22.04/24.04)
@@ -19,7 +80,7 @@ ssh user@ip-vps-cua-ban
 # Cài qua npm (khuyến nghị)
 npm install -g clawdbot@latest
 
-# Hoặc dùng installer chính thức
+# Hoặc dùng installer chính thức (⚠️ xem script trước - đọc Cảnh báo bảo mật)
 curl -fsSL https://clawd.bot/install.sh | bash
 
 # Thêm npm global bin vào PATH (nếu cần)
@@ -30,6 +91,8 @@ source ~/.zshrc
 ### 2. Cấu hình MiniMax Coding Plan
 
 Chỉnh sửa `~/.clawdbot/clawdbot.json`:
+
+> ⚠️ **Bảo mật:** Sau khi tạo file này, chạy `chmod 600 ~/.clawdbot/clawdbot.json` để bảo vệ API key.
 
 ```json
 {
@@ -60,6 +123,8 @@ Chỉnh sửa `~/.clawdbot/clawdbot.json`:
 ```bash
 clawdbot onboard --non-interactive --accept-risk --mode local --install-daemon
 ```
+
+> ⚠️ **Lưu ý:** `--accept-risk` bỏ qua các bước xác nhận. Lần đầu cài đặt, nên chạy không có cờ này để xem từng bước: `clawdbot onboard`
 
 ### 4. Đặt MiniMax làm Model mặc định
 
@@ -98,6 +163,8 @@ clawdbot doctor
 ```
 
 > **Lưu ý:** Khi dùng `dmPolicy: "open"`, bắt buộc phải có `allowFrom: ["*"]`
+>
+> ⚠️ **Cảnh báo bảo mật:** `dmPolicy: "open"` cho phép BẤT KỲ AI cũng nhắn tin cho bot. Dùng `allowlist` mode trên production để ngăn truy cập trái phép và tiêu tốn API credits.
 
 2. Liên kết tài khoản WhatsApp:
 
@@ -164,6 +231,10 @@ clawdbot pairing approve whatsapp <CODE>
 ```
 
 > **Lưu ý:** Khi dùng `dmPolicy: "open"`, bắt buộc phải có `allowFrom: ["*"]`. Tương tự cho groups.
+>
+> ⚠️ **Cảnh báo bảo mật:** `dmPolicy: "open"` + `groupPolicy: "open"` cho phép BẤT KỲ AI cũng dùng bot. Dùng `allowlist` hoặc `pairing` mode trên production.
+
+> ⚠️ **Không chia sẻ bot token.** Nếu bị lộ, dùng BotFather `/revoke` để tạo token mới.
 
 3. Khởi động lại gateway:
 
@@ -177,7 +248,7 @@ systemctl --user restart clawdbot-gateway
 
 | Tùy chọn | Giá trị | Mô tả |
 |----------|---------|-------|
-| `botToken` | `"123:ABC..."` | Token bot từ BotFather |
+| `botToken` | `"123:ABC..."` | Token bot từ BotFather (⚠️ giữ bí mật) |
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | Kiểm soát tin nhắn riêng |
 | `allowFrom` | `["*"]` hoặc `["user_id"]` | Bắt buộc khi dmPolicy là `open` |
 | `groupPolicy` | `allowlist`, `open`, `disabled` | Kiểm soát tin nhắn nhóm |
@@ -246,6 +317,10 @@ systemctl --user restart clawdbot-gateway
 ```
 
 > **Lưu ý:** KHÔNG dùng `"enabled": true` - key này không hợp lệ.
+>
+> ⚠️ **Cảnh báo bảo mật:** `dmPolicy: "open"` cho phép BẤT KỲ user Discord nào cũng DM bot. Dùng `allowlist` mode với user ID cụ thể trên production.
+
+> ⚠️ **Không chia sẻ Discord bot token.** Nếu bị lộ, tạo token mới trong Developer Portal ngay.
 
 4. Khởi động lại gateway:
 

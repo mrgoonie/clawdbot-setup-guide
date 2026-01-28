@@ -2,6 +2,67 @@
 
 Deploy ClawdBot on Ubuntu VPS with MiniMax M2.1 as the AI backend.
 
+## ⚠️ Security Warnings
+
+> **IMPORTANT:** Read these warnings before deploying ClawdBot in production.
+
+### Installation Security
+
+- **Curl-pipe-bash risk:** The `curl | bash` installation method executes remote code without inspection. Always review scripts before running: `curl -fsSL https://clawd.bot/install.sh -o install.sh && less install.sh && bash install.sh`
+- **Verify checksums:** When possible, verify package integrity before installation
+
+### API Keys & Credentials
+
+- **Never commit credentials:** Do not commit `clawdbot.json` with API keys to version control. Add it to `.gitignore`
+- **Use environment variables:** Consider using `MINIMAX_API_KEY`, `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN` env vars instead of hardcoding in config
+- **Restrict file permissions:** `chmod 600 ~/.clawdbot/clawdbot.json` to prevent other users from reading your credentials
+- **Rotate keys regularly:** If you suspect key exposure, regenerate immediately
+
+### Access Control ⚠️
+
+- **`dmPolicy: "open"` + `allowFrom: ["*"]` = ANYONE can use your bot.** This includes strangers, spammers, and malicious actors who will consume your API credits
+- **Prefer `allowlist` mode** in production with explicit phone numbers/user IDs
+- **`pairing` mode** adds friction but prevents unauthorized access
+- **Monitor usage:** Check `clawdbot logs` regularly for unexpected activity
+
+### Network Security
+
+- **`gateway.bind: "loopback"`** (default) only accepts local connections - **do not change to `0.0.0.0` unless behind a firewall**
+- **Firewall rules:** If exposing the gateway port, restrict access via `ufw` or `iptables`
+- **Use reverse proxy:** For remote access, use nginx/caddy with TLS instead of exposing the port directly
+
+### Bot Token Security
+
+- **Telegram/Discord tokens grant full bot control.** Treat them like passwords
+- **Revoke compromised tokens immediately:** Use BotFather `/revoke` or Discord Developer Portal
+- **Don't share tokens** in screenshots, logs, or support requests
+
+### Workspace Security
+
+- **`agents.defaults.workspace`** defines where the AI can read/write files. Restrict to a dedicated directory
+- **Never set workspace to `/` or `$HOME`** - this gives the AI access to sensitive files
+- **Consider sandboxing** with containers or restricted users for high-security deployments
+
+### Security Audit Tool
+
+Use [Clawdbot-Security-Check](https://github.com/TheSethRose/Clawdbot-Security-Check) for automated security audits:
+
+- **Self-audit framework** that teaches ClawdBot to evaluate its own security posture
+- **13 security domains** covered: gateway exposure, DM policies, credentials, file permissions, plugin trust, prompt injection risks, secret scanning, and more
+- **Read-only auditing** - generates reports without modifying your config
+- **Remediation guidance** for each finding
+
+```bash
+# Install
+clawdhub install clawdbot-security-check
+
+# Run audit
+@clawdbot audit my security
+@clawdbot security audit --deep
+```
+
+---
+
 ## Prerequisites
 
 - Ubuntu VPS (tested on 22.04/24.04)
@@ -19,7 +80,7 @@ ssh user@your-vps-ip
 # Install via npm (recommended)
 npm install -g clawdbot@latest
 
-# Or use the official installer
+# Or use the official installer (⚠️ review script first - see Security Warnings)
 curl -fsSL https://clawd.bot/install.sh | bash
 
 # Add npm global bin to PATH (if needed)
@@ -30,6 +91,8 @@ source ~/.zshrc
 ### 2. Configure MiniMax Coding Plan
 
 Edit `~/.clawdbot/clawdbot.json`:
+
+> ⚠️ **Security:** After creating this file, run `chmod 600 ~/.clawdbot/clawdbot.json` to protect your API key.
 
 ```json
 {
@@ -60,6 +123,8 @@ Edit `~/.clawdbot/clawdbot.json`:
 ```bash
 clawdbot onboard --non-interactive --accept-risk --mode local --install-daemon
 ```
+
+> ⚠️ **Note:** `--accept-risk` bypasses confirmation prompts. For first-time setup, consider running without this flag to review each step: `clawdbot onboard`
 
 ### 4. Set MiniMax as Default Model
 
@@ -98,6 +163,8 @@ clawdbot doctor
 ```
 
 > **Note:** When using `dmPolicy: "open"`, you must include `allowFrom: ["*"]`
+>
+> ⚠️ **Security Warning:** `dmPolicy: "open"` allows ANYONE to message your bot. Use `allowlist` mode in production to prevent unauthorized access and API credit abuse.
 
 2. Link your WhatsApp account:
 
@@ -164,6 +231,10 @@ clawdbot pairing approve whatsapp <CODE>
 ```
 
 > **Note:** When using `dmPolicy: "open"`, you must include `allowFrom: ["*"]`. Same for groups.
+>
+> ⚠️ **Security Warning:** `dmPolicy: "open"` + `groupPolicy: "open"` allows ANYONE to use your bot. Use `allowlist` or `pairing` mode in production.
+
+> ⚠️ **Never share your bot token.** If compromised, use BotFather `/revoke` to regenerate.
 
 3. Restart gateway:
 
@@ -177,7 +248,7 @@ systemctl --user restart clawdbot-gateway
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `botToken` | `"123:ABC..."` | Bot token from BotFather |
+| `botToken` | `"123:ABC..."` | Bot token from BotFather (⚠️ keep secret) |
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | DM access control |
 | `allowFrom` | `["*"]` or `["user_id"]` | Required when dmPolicy is `open` |
 | `groupPolicy` | `allowlist`, `open`, `disabled` | Group access control |
@@ -246,6 +317,10 @@ systemctl --user restart clawdbot-gateway
 ```
 
 > **Note:** Do NOT use `"enabled": true` - this key is not valid.
+>
+> ⚠️ **Security Warning:** `dmPolicy: "open"` allows ANY Discord user to DM your bot. Use `allowlist` mode with specific user IDs in production.
+
+> ⚠️ **Never share your Discord bot token.** If compromised, regenerate it in the Developer Portal immediately.
 
 4. Restart gateway:
 
@@ -257,7 +332,7 @@ systemctl --user restart clawdbot-gateway
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `token` | `"YOUR_BOT_TOKEN"` | Discord bot token |
+| `token` | `"YOUR_BOT_TOKEN"` | Discord bot token (⚠️ keep secret) |
 | `dmPolicy` | `pairing`, `allowlist`, `open`, `disabled` | DM access control |
 | `allowFrom` | `["*"]` or `["user_id"]` | Required when dmPolicy is `open` |
 | `guilds.<id>.allowFrom` | `["user_id"]` | Per-guild allowlist |
@@ -299,6 +374,13 @@ clawdbot models set <model>
 ## Configuration Reference
 
 Full config file location: `~/.clawdbot/clawdbot.json`
+
+> ⚠️ **Security:** This file contains sensitive credentials. Protect it:
+> ```bash
+> chmod 600 ~/.clawdbot/clawdbot.json
+> # Add to .gitignore if in a repo
+> echo "clawdbot.json" >> .gitignore
+> ```
 
 ```json
 {
